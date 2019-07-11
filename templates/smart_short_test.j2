@@ -1,0 +1,8 @@
+#!/bin/bash
+
+echo "### SMART Short Test ###"
+{% for drive in SERVER_DRIVES %}
+smartctl --test=short {{ drive }}
+{% endfor %}
+
+exit 0

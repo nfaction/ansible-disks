@@ -1,0 +1,11 @@
+---
+# defaults file for server-disks
+
+SERVER_DRIVES:
+  - /dev/sda
+
+CRONS:
+  - { cron_scripts: 'raid_check.j2', cron_path: '/etc/cron.weekly/raid_check', mode: '0755' }
+  - { cron_scripts: 'zfs_scrub.j2', cron_path: '/etc/cron.monthly/raid_check', mode: '0755' }
+  - { cron_scripts: 'smart_short_test.j2', cron_path: '/etc/cron.weekly/smart_short_test', mode: '0755' }
+  - { cron_scripts: 'smart_long_test.j2', cron_path: '/etc/cron.monthly/smart_long_test', mode: '0755' }

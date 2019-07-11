@@ -1,0 +1,17 @@
+#!/bin/bash
+
+echo "### ZFS Status ###"
+zpool status {{ ZFS.POOL_NAME }}
+echo
+
+echo "### MDADM Status ###"
+{% for disk in MDADM_DISKS %}
+mdadm --detail {{ disk }}
+{% endfor %}
+
+echo "### SMART Status ###"
+{% for drive in SERVER_DRIVES %}
+smartctl -H {{ drive }}
+{% endfor %}
+
+exit 0

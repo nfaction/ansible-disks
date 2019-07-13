@@ -1,11 +1,54 @@
 ---
-# defaults file for server-disks
 
-SERVER_DRIVES:
-  - /dev/sda
+# Workarounds for running the playbook in this role
+ansible_root_dir: "{{ playbook_dir }}"
+ansible_root_dir_roles_path: "{{ ansible_root_dir }}/roles"
 
-CRONS:
-  - { cron_scripts: 'raid_check.j2', cron_path: '/etc/cron.weekly/raid_check', mode: '0755' }
-  - { cron_scripts: 'zfs_scrub.j2', cron_path: '/etc/cron.monthly/raid_check', mode: '0755' }
-  - { cron_scripts: 'smart_short_test.j2', cron_path: '/etc/cron.weekly/smart_short_test', mode: '0755' }
-  - { cron_scripts: 'smart_long_test.j2', cron_path: '/etc/cron.monthly/smart_long_test', mode: '0755' }
+disk_packages:
+  - util-linux
+  - smartmontools
+
+disks: []
+ssds: []
+raid_arrays: []
+all_disks: []
+
+###################
+# SMARTd Settings #
+###################
+smart_available_search_string: "SMART support is: Available"
+
+disks_with_smart_capabilities: []
+
+smartd_short_test_month: '..'
+smartd_short_test_dom: '..'
+smartd_short_test_dow: '.'
+smartd_short_test_hour: 'random'
+
+smartd_long_test_month: '..'
+smartd_long_test_dom: '..'
+smartd_long_test_dow: 'random'
+smartd_long_test_hour: 'random'
+
+#######################
+# Configuration Files #
+#######################
+disk_templates:
+  - name: smartd config
+    src: smartd.conf.j2
+    dest: /etc/smartd.conf
+    when: "disks_with_smart_capabilities | length"
+
+smartd_config_path: "/etc/default/smartmontools"
+
+file_modifications:
+  - name: enable smartd on system startup
+    dest: "{{ smartd_config_path }}"
+    regexp: "^start_smartd="
+    line: "start_smartd=yes"
+    when: "disks_with_smart_capabilities | length"
+  - name: enable smartd on system startup
+    dest: "{{ smartd_config_path }}"
+    regexp: "^smartd_opts="
+    line: 'smartd_opts="--interval=1800"'
+    when: "disks_with_smart_capabilities | length"

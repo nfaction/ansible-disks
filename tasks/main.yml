@@ -1,14 +1,121 @@
 ---
-# tasks file for server-disks
 
 - name: gather os specific variables
   include_vars: "{{ item }}"
   with_first_found:
     - "{{ ansible_distribution }}-{{ ansible_distribution_major_version }}.yml"
     - "{{ ansible_distribution }}.yml"
-  tags: vars
+  tags:
+    - vars
 
-- name: configure crons
-  template: src={{ item.cron_scripts }} dest={{ item.cron_path }} mode={{ item.mode }}
-  with_items: '{{ CRONS }}'
-  tags: template-crons
+- name: install disk packages
+  package:
+    name: "{{ item }}"
+    state: present
+    use: "{{ package_override | default(omit) }}"
+  register: install_result
+  until: install_result | succeeded
+  with_items:
+    - "{{ disk_packages }}"
+  tags:
+    - install
+
+- name: build list of ssds
+  set_fact:
+    ssds: "{{ ssds }} + [ '{{ item.key }}' ]"
+  with_dict: "{{ ansible_devices }}"
+  when:
+    - item.value.rotational == "0"
+    - not item.key.startswith('md')
+    - not item.key.startswith('nbd')
+    - not item.key.startswith('sr')
+    - not item.key.startswith('loop')
+
+- name: build list of spinning disks
+  set_fact:
+    disks: "{{ disks }} + [ '{{ item.key }}' ]"
+  with_dict: "{{ ansible_devices }}"
+  when:
+    - item.value.rotational == "1"
+    - not item.key.startswith('md')
+    - not item.key.startswith('nbd')
+    - not item.key.startswith('sr')
+    - not item.key.startswith('loop')
+
+- name: build list of mdadm raid disks
+  set_fact:
+    raid_arrays: "{{ raid_arrays }} + [ '{{ item.key }}' ]"
+  with_dict: "{{ ansible_devices }}"
+  when:
+    - item.key.startswith('md')
+    - not item.key.startswith('nbd')
+    - not item.key.startswith('sr')
+    - not item.key.startswith('loop')
+
+- name: build list of all disks
+  set_fact:
+    all_disks: "{{ all_disks }} + [ '{{ item.key }}' ]"
+  with_dict: "{{ ansible_devices }}"
+  when:
+    - not item.key.startswith('md')
+    - not item.key.startswith('nbd')
+    - not item.key.startswith('sr')
+    - not item.key.startswith('loop')
+
+- name: check if disks support SMART
+  shell: "smartctl --info /dev/{{ item }} | grep '{{ smart_available_search_string }}'"
+  with_items:
+    - "{{ all_disks }}"
+  register: smart_devices
+  changed_when: false
+  failed_when: false
+
+- name: build list of disks with smart available
+  set_fact:
+    disks_with_smart_capabilities: "{{ disks_with_smart_capabilities }} + [ '{{ item.item }}' ]"
+  with_items:
+    - "{{ smart_devices.results }}"
+  when:
+    - "'Available' in item.stdout"
+
+- name: template configuration files
+  template:
+    src: "{{ item.src }}"
+    dest: "{{ item.dest }}"
+    owner: "{{ item.owner | default('root') }}"
+    group: "{{ item.group | default('root') }}"
+    mode: "{{ item.mode | default('0644') }}"
+  with_items:
+    - "{{ disk_templates }}"
+  when:
+    - '{{ item.when | default(true) }}'
+  tags:
+    - template-configs
+
+- name: modify configuration files
+  lineinfile:
+    dest: "{{ item.dest }}"
+    regexp: "{{ item.regexp }}"
+    line: "{{ item.line }}"
+  with_items:
+    - "{{ file_modifications }}"
+  when:
+    - '{{ item.when | default(true) }}'
+  tags:
+    - template-configs
+
+- name: enable and start smartd service (when applicable)
+  service:
+    name: smartd
+    enabled: true
+    state: started
+  when:
+    - "disks_with_smart_capabilities | length"
+
+- name: enable and start fstrim
+  service:
+    name: fstrim.timer
+    state: started
+    enabled: true
+  when:
+    - "ssds | length"

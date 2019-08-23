@@ -20,5 +20,5 @@
 {%     set smartd_short_test_hour = range(1,24)|random %}
 {%     set smartd_short_test_hour = "{0:02d}".format(smartd_short_test_hour) %}
 {%   endif %}
-{{ disk }} -a -o on -S on -s (S/{{ smartd_short_test_month }}/{{ smartd_short_test_dom }}/{{ smartd_short_test_dow }}/{{ smartd_short_test_hour }}|L/{{ smartd_long_test_month }}/{{ smartd_long_test_dom }}/{{ smartd_long_test_dow }}/{{ smartd_long_test_hour }}) -m root
+/dev/{{ disk }} -a -o on -S on -s (S/{{ smartd_short_test_month }}/{{ smartd_short_test_dom }}/{{ smartd_short_test_dow }}/{{ smartd_short_test_hour }}|L/{{ smartd_long_test_month }}/{{ smartd_long_test_dom }}/{{ smartd_long_test_dow }}/{{ smartd_long_test_hour }}) -m root
 {% endfor %}

@@ -8,13 +8,19 @@
   tags:
     - vars
 
+- name: perform an apt update
+  apt:
+    update_cache: yes
+    cache_valid_time: 3600
+  when:
+    - ansible_os_family == 'Debian'
+
 - name: install disk packages
   package:
     name: "{{ item }}"
     state: present
     use: "{{ package_override | default(omit) }}"
-  register: install_result
-  until: install_result | succeeded
+  retries: 5
   with_items:
     - "{{ disk_packages }}"
   tags:

@@ -1,6 +1,6 @@
 # ansible-disks
 
-[![Build Status](https://travis-ci.org/nfaction/ansible-disks.svg?branch=master)](https://travis-ci.org/nfaction/ansible-disks)
+[![Ansible Molecule Test Matrix](https://github.com/nfaction/ansible-disks/actions/workflows/molecule.yml/badge.svg)](https://github.com/nfaction/ansible-disks/actions/workflows/molecule.yml)
 
 Configure disks for use in monitoring and maintenance.
 

@@ -1,5 +1,7 @@
 ---
 galaxy_info:
+  role_name: disks
+  namespace: ansible
   author: Matthew DePorter
   description: Role to configure disks on a system
   company: Mobile-Tech LLC

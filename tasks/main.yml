@@ -20,8 +20,7 @@
     name: "{{ item }}"
     state: present
     use: "{{ package_override | default(omit) }}"
-  register: install_result
-  until: install_result | succeeded
+  retries: 5
   with_items:
     - "{{ disk_packages }}"
   tags:

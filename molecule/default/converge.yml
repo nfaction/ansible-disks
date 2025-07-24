@@ -1,7 +1,42 @@
 ---
 - name: Converge
   hosts: all
-  vars: []
-  # os_vars_dir: ../../../../group_vars/operating-systems
+  vars:
+    # Test with all features enabled (default behavior)
+    enable_disk_discovery: true
+    enable_smart_monitoring: true
+    enable_ssd_trim: true
+    enable_disk_formatting: true
+    
+    # Test configuration with 3 disks
+    disks_to_format:
+      - device: /dev/loop1
+        filesystem: ext4
+        mount_point: /mnt/data1
+        mount_options: defaults,noatime
+        state: present
+      - device: /dev/loop2
+        filesystem: ext4
+        mount_point: /mnt/data2
+        mount_options: defaults
+        state: present  
+      - device: /dev/loop3
+        filesystem: ext4
+        mount_point: /mnt/backup
+        mount_options: defaults,noatime,nodev
+        state: present
+  pre_tasks:
+    # Create mock loop devices for testing (since we can't create real block devices in containers)
+    - name: create test files for loop devices
+      command: "dd if=/dev/zero of=/tmp/test{{ item }}.img bs=1M count=100"
+      with_items: [1, 2, 3]
+      changed_when: false
+
+    - name: create loop devices
+      command: "losetup /dev/loop{{ item }} /tmp/test{{ item }}.img"
+      with_items: [1, 2, 3]
+      changed_when: false
+      failed_when: false
+
   roles:
     - role: ansible-disks

@@ -4,9 +4,19 @@
 ansible_root_dir: "{{ playbook_dir }}"
 ansible_root_dir_roles_path: "{{ ansible_root_dir }}/roles"
 
+####################
+# Feature Toggles  #
+####################
+# Enable/disable different functionality sections
+enable_disk_discovery: true
+enable_smart_monitoring: true
+enable_ssd_trim: true
+enable_disk_formatting: true
+
 disk_packages:
   - util-linux
   - smartmontools
+  - e2fsprogs
 
 disks: []
 ssds: []
@@ -52,3 +62,30 @@ file_modifications:
     regexp: "^smartd_opts="
     line: 'smartd_opts="--interval=1800"'
     when: "disks_with_smart_capabilities | length"
+
+########################
+# Disk Formatting      #
+########################
+# List of disks to format and mount
+# Example:
+# disks_to_format:
+#   - device: /dev/sdb
+#     filesystem: ext4
+#     mount_point: /mnt/data1
+#     mount_options: defaults
+#     state: present
+#   - device: /dev/sdc
+#     filesystem: ext4
+#     mount_point: /mnt/data2 
+#     mount_options: defaults,noatime
+#     state: present
+disks_to_format: []
+
+# Default filesystem type
+default_filesystem: ext4
+
+# Default mount options
+default_mount_options: defaults
+
+# Whether to create mount point directories
+create_mount_dirs: true

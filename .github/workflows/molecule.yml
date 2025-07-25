@@ -35,6 +35,7 @@ jobs:
     strategy:
       matrix:
         distro:
+          - centos7
           - debian12
           - ubuntu2204
           - ubuntu2404

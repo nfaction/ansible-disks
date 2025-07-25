@@ -20,6 +20,6 @@ provisioner:
     converge: ${MOLECULE_PLAYBOOK:-converge.yml}
   config_options:
     defaults:
-      roles_path: ../..
+      roles_path: ${MOLECULE_PROJECT_DIRECTORY}/../..:${MOLECULE_PROJECT_DIRECTORY}
 verifier:
   name: ansible

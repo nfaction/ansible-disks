@@ -38,5 +38,7 @@
       changed_when: false
       failed_when: false
 
-  roles:
-    - role: "{{ lookup('env', 'MOLECULE_PROJECT_DIRECTORY') | basename }}"
+  tasks:
+    - name: "Include ansible-disks"
+      include_role:
+        name: "ansible-disks"

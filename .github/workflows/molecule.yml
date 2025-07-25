@@ -49,6 +49,9 @@ jobs:
         with:
           python-version: '3.x'
 
+      - name: Set up Docker
+        uses: docker-practice/actions-setup-docker@v1
+
       - name: Install test dependencies.
         run: pip3 install ansible molecule[docker] docker
 

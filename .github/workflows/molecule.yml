@@ -9,6 +9,10 @@ on:
 
   workflow_dispatch:
 
+defaults:
+  run:
+    working-directory: 'ansible-disks'
+
 jobs:
   lint:
     name: Lint
@@ -16,6 +20,8 @@ jobs:
     steps:
       - name: Check out the codebase.
         uses: actions/checkout@v2
+        with:
+          path: 'ansible-disks'
 
       - name: Set up Python 3.
         uses: actions/setup-python@v2
@@ -43,6 +49,8 @@ jobs:
     steps:
       - name: Check out the codebase.
         uses: actions/checkout@v2
+        with:
+          path: 'ansible-disks'
 
       - name: Set up Python 3.
         uses: actions/setup-python@v2

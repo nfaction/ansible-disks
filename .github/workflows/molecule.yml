@@ -9,10 +9,6 @@ on:
 
   workflow_dispatch:
 
-defaults:
-  run:
-    working-directory: 'ansible-disks'
-
 jobs:
   lint:
     name: Lint
@@ -64,9 +60,17 @@ jobs:
 
       - name: Install test dependencies.
         run: pip3 install ansible molecule molecule-plugins[docker] docker
+        working-directory: ansible-disks
+
+      - name: Create role symlink for Molecule
+        run: |
+          mkdir -p molecule/default/roles
+          ln -s ../../.. molecule/default/roles/ansible-disks
+        working-directory: ansible-disks
 
       - name: Run Molecule tests.
         run: molecule test
+        working-directory: ansible-disks
         env:
           PY_COLORS: '1'
           ANSIBLE_FORCE_COLOR: '1'

@@ -10,7 +10,7 @@
 
 - name: perform an apt update
   apt:
-    update_cache: yes
+    update_cache: true
     cache_valid_time: 3600
   when:
     - ansible_os_family == 'Debian'
@@ -82,7 +82,9 @@
 - name: smart monitoring tasks
   block:
     - name: check if disks support SMART
-      shell: "smartctl --info /dev/{{ item }} | grep '{{ smart_available_search_string }}'"
+      shell: >
+        smartctl --info /dev/{{ item }} |
+        grep '{{ smart_available_search_string }}'
       with_items:
         - "{{ all_disks }}"
       register: smart_devices
@@ -91,7 +93,8 @@
 
     - name: build list of disks with smart available
       set_fact:
-        disks_with_smart_capabilities: "{{ disks_with_smart_capabilities }} + [ '{{ item.item }}' ]"
+        disks_with_smart_capabilities: >-
+          {{ disks_with_smart_capabilities }} + [ '{{ item.item }}' ]
       with_items:
         - "{{ smart_devices.results }}"
       when:
@@ -168,14 +171,26 @@
       tags:
         - mount-dirs
 
-    - name: format disks with specified filesystem
-      community.general.filesystem:
-        fstype: "{{ item.filesystem | default(default_filesystem) }}"
-        dev: "{{ item.device }}"
-        force: "{{ item.force | default(false) }}"
+    - name: check existing filesystem on devices
+      command: blkid -s TYPE -o value {{ item.device }}
+      register: existing_filesystem
+      failed_when: false
+      changed_when: false
       with_items: "{{ disks_to_format }}"
       when:
+        - enable_disk_formatting | bool
         - item.state | default('present') == 'present'
+
+    - name: format disks with specified filesystem
+      community.general.filesystem:
+        fstype: "{{ item.item.filesystem | default(default_filesystem) }}"
+        dev: "{{ item.item.device }}"
+        force: "{{ item.item.force | default(false) }}"
+      with_items: "{{ existing_filesystem.results }}"
+      when:
+        - enable_disk_formatting | bool
+        - item.item.state | default('present') == 'present'
+        - item.rc != 0 or item.stdout != (item.item.filesystem | default(default_filesystem))
 
     - name: mount disks and add to fstab
       ansible.posix.mount:

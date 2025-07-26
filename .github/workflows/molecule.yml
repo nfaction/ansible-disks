@@ -1,7 +1,7 @@
 ---
 name: Ansible Molecule Test Matrix
 
-on:
+'on':
   push:
     branches:
       - master

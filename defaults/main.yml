@@ -76,7 +76,7 @@ file_modifications:
 #     state: present
 #   - device: /dev/sdc
 #     filesystem: ext4
-#     mount_point: /mnt/data2 
+#     mount_point: /mnt/data2
 #     mount_options: defaults,noatime
 #     state: present
 disks_to_format: []

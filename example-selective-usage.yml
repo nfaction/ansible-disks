@@ -18,7 +18,7 @@
     - ansible-disks
 
 ---
-# Example 2: Only SMART monitoring, no disk formatting  
+# Example 2: Only SMART monitoring, no disk formatting
 - name: SMART monitoring only
   hosts: all
   vars:

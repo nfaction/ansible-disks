@@ -172,9 +172,9 @@
         - mount-dirs
 
     - name: check existing filesystem on devices
-      command: blkid -s TYPE -o value {{ item.device }}
+      shell: >
+        blkid -s TYPE -o value {{ item.device }} 2>/dev/null || echo "none"
       register: existing_filesystem
-      failed_when: false
       changed_when: false
       with_items: "{{ disks_to_format }}"
       when:
@@ -190,7 +190,9 @@
       when:
         - enable_disk_formatting | bool
         - item.item.state | default('present') == 'present'
-        - item.rc != 0 or item.stdout != (item.item.filesystem | default(default_filesystem))
+        - >-
+          item.stdout == "none" or 
+          item.stdout != (item.item.filesystem | default(default_filesystem))
 
     - name: mount disks and add to fstab
       ansible.posix.mount:

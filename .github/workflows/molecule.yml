@@ -1,7 +1,7 @@
 ---
 name: Ansible Molecule Test Matrix
 
-on:
+'on':
   push:
     branches:
       - master
@@ -16,6 +16,8 @@ jobs:
     steps:
       - name: Check out the codebase.
         uses: actions/checkout@v2
+        with:
+          path: 'ansible-disks'
 
       - name: Set up Python 3.
         uses: actions/setup-python@v2
@@ -35,25 +37,40 @@ jobs:
     strategy:
       matrix:
         distro:
-          - debian10
-          - debian11
-          - centos7
-          - ubuntu2004
+          # - centos7
+          - debian12
+          - ubuntu2204
+          - ubuntu2404
 
     steps:
       - name: Check out the codebase.
         uses: actions/checkout@v2
+        with:
+          path: 'ansible-disks'
 
       - name: Set up Python 3.
         uses: actions/setup-python@v2
         with:
           python-version: '3.x'
 
+      - name: Set up Docker
+        run: |
+          sudo systemctl start docker
+          sudo systemctl status docker
+
       - name: Install test dependencies.
-        run: pip3 install ansible molecule[docker] docker
+        run: pip3 install ansible molecule molecule-plugins[docker] docker
+        working-directory: ansible-disks
+
+      - name: Create role symlink for Molecule
+        run: |
+          mkdir -p molecule/default/roles
+          ln -s ../../.. molecule/default/roles/ansible-disks
+        working-directory: ansible-disks
 
       - name: Run Molecule tests.
         run: molecule test
+        working-directory: ansible-disks
         env:
           PY_COLORS: '1'
           ANSIBLE_FORCE_COLOR: '1'

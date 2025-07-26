@@ -10,7 +10,7 @@
 
 - name: perform an apt update
   apt:
-    update_cache: yes
+    update_cache: true
     cache_valid_time: 3600
   when:
     - ansible_os_family == 'Debian'
@@ -26,102 +26,186 @@
   tags:
     - install
 
-- name: build list of ssds
-  set_fact:
-    ssds: "{{ ssds }} + [ '{{ item.key }}' ]"
-  with_dict: "{{ ansible_devices }}"
-  when:
-    - item.value.rotational == "0"
-    - not item.key.startswith('md')
-    - not item.key.startswith('nbd')
-    - not item.key.startswith('sr')
-    - not item.key.startswith('loop')
+#####################
+# Disk Discovery    #
+#####################
+- name: disk discovery tasks
+  block:
+    - name: build list of ssds
+      set_fact:
+        ssds: "{{ ssds }} + [ '{{ item.key }}' ]"
+      with_dict: "{{ ansible_devices }}"
+      when:
+        - item.value.rotational == "0"
+        - not item.key.startswith('md')
+        - not item.key.startswith('nbd')
+        - not item.key.startswith('sr')
+        - not item.key.startswith('loop')
 
-- name: build list of spinning disks
-  set_fact:
-    disks: "{{ disks }} + [ '{{ item.key }}' ]"
-  with_dict: "{{ ansible_devices }}"
-  when:
-    - item.value.rotational == "1"
-    - not item.key.startswith('md')
-    - not item.key.startswith('nbd')
-    - not item.key.startswith('sr')
-    - not item.key.startswith('loop')
+    - name: build list of spinning disks
+      set_fact:
+        disks: "{{ disks }} + [ '{{ item.key }}' ]"
+      with_dict: "{{ ansible_devices }}"
+      when:
+        - item.value.rotational == "1"
+        - not item.key.startswith('md')
+        - not item.key.startswith('nbd')
+        - not item.key.startswith('sr')
+        - not item.key.startswith('loop')
 
-- name: build list of mdadm raid disks
-  set_fact:
-    raid_arrays: "{{ raid_arrays }} + [ '{{ item.key }}' ]"
-  with_dict: "{{ ansible_devices }}"
-  when:
-    - item.key.startswith('md')
-    - not item.key.startswith('nbd')
-    - not item.key.startswith('sr')
-    - not item.key.startswith('loop')
+    - name: build list of mdadm raid disks
+      set_fact:
+        raid_arrays: "{{ raid_arrays }} + [ '{{ item.key }}' ]"
+      with_dict: "{{ ansible_devices }}"
+      when:
+        - item.key.startswith('md')
+        - not item.key.startswith('nbd')
+        - not item.key.startswith('sr')
+        - not item.key.startswith('loop')
 
-- name: build list of all disks
-  set_fact:
-    all_disks: "{{ all_disks }} + [ '{{ item.key }}' ]"
-  with_dict: "{{ ansible_devices }}"
-  when:
-    - not item.key.startswith('md')
-    - not item.key.startswith('nbd')
-    - not item.key.startswith('sr')
-    - not item.key.startswith('loop')
-
-- name: check if disks support SMART
-  shell: "smartctl --info /dev/{{ item }} | grep '{{ smart_available_search_string }}'"
-  with_items:
-    - "{{ all_disks }}"
-  register: smart_devices
-  changed_when: false
-  failed_when: false
-
-- name: build list of disks with smart available
-  set_fact:
-    disks_with_smart_capabilities: "{{ disks_with_smart_capabilities }} + [ '{{ item.item }}' ]"
-  with_items:
-    - "{{ smart_devices.results }}"
-  when:
-    - "'Available' in item.stdout"
-
-- name: template configuration files
-  template:
-    src: "{{ item.src }}"
-    dest: "{{ item.dest }}"
-    owner: "{{ item.owner | default('root') }}"
-    group: "{{ item.group | default('root') }}"
-    mode: "{{ item.mode | default('0644') }}"
-  with_items:
-    - "{{ disk_templates }}"
-  when:
-    - '{{ item.when | default(true) }}'
+    - name: build list of all disks
+      set_fact:
+        all_disks: "{{ all_disks }} + [ '{{ item.key }}' ]"
+      with_dict: "{{ ansible_devices }}"
+      when:
+        - not item.key.startswith('md')
+        - not item.key.startswith('nbd')
+        - not item.key.startswith('sr')
+        - not item.key.startswith('loop')
+  when: enable_disk_discovery | bool
   tags:
-    - template-configs
+    - disk-discovery
 
-- name: modify configuration files
-  lineinfile:
-    dest: "{{ item.dest }}"
-    regexp: "{{ item.regexp }}"
-    line: "{{ item.line }}"
-  with_items:
-    - "{{ file_modifications }}"
-  when:
-    - '{{ item.when | default(true) }}'
+#####################
+# SMART Monitoring  #
+#####################
+- name: smart monitoring tasks
+  block:
+    - name: check if disks support SMART
+      shell: >
+        smartctl --info /dev/{{ item }} |
+        grep '{{ smart_available_search_string }}'
+      with_items:
+        - "{{ all_disks }}"
+      register: smart_devices
+      changed_when: false
+      failed_when: false
+
+    - name: build list of disks with smart available
+      set_fact:
+        disks_with_smart_capabilities: >-
+          {{ disks_with_smart_capabilities }} + [ '{{ item.item }}' ]
+      with_items:
+        - "{{ smart_devices.results }}"
+      when:
+        - "'Available' in item.stdout"
+
+    - name: template configuration files
+      template:
+        src: "{{ item.src }}"
+        dest: "{{ item.dest }}"
+        owner: "{{ item.owner | default('root') }}"
+        group: "{{ item.group | default('root') }}"
+        mode: "{{ item.mode | default('0644') }}"
+      with_items:
+        - "{{ disk_templates }}"
+      when:
+        - item.when | default(true)
+      tags:
+        - template-configs
+
+    - name: modify configuration files
+      lineinfile:
+        dest: "{{ item.dest }}"
+        regexp: "{{ item.regexp }}"
+        line: "{{ item.line }}"
+      with_items:
+        - "{{ file_modifications }}"
+      when:
+        - item.when | default(true)
+      tags:
+        - template-configs
+
+    - name: enable and start smartd service (when applicable)
+      service:
+        name: smartd
+        enabled: true
+        state: started
+      when:
+        - "disks_with_smart_capabilities | length"
+  when: enable_smart_monitoring | bool
   tags:
-    - template-configs
+    - smart-monitoring
 
-- name: enable and start smartd service (when applicable)
-  service:
-    name: smartd
-    enabled: true
-    state: started
-  when:
-    - "disks_with_smart_capabilities | length"
+##################
+# SSD Trim       #
+##################
+- name: ssd trim tasks
+  block:
+    - name: enable and start fstrim
+      service:
+        name: fstrim.timer
+        state: started
+        enabled: true
+      when:
+        - "ssds | length"
+  when: enable_ssd_trim | bool
+  tags:
+    - ssd-trim
 
-- name: enable and start fstrim
-  service:
-    name: fstrim.timer
-    state: started
-    enabled: true
-  when:
-    - "ssds | length"
+########################
+# Disk Formatting      #
+########################
+- name: disk formatting tasks
+  block:
+    - name: create mount point directories
+      file:
+        path: "{{ item.mount_point }}"
+        state: directory
+        mode: '0755'
+      with_items: "{{ disks_to_format }}"
+      when:
+        - create_mount_dirs | bool
+        - item.state | default('present') == 'present'
+        - item.mount_point is defined
+      tags:
+        - mount-dirs
+
+    - name: format disks with specified filesystem
+      community.general.filesystem:
+        fstype: "{{ item.filesystem | default(default_filesystem) }}"
+        dev: "{{ item.device }}"
+        force: "{{ item.force | default(false) }}"
+      with_items: "{{ disks_to_format }}"
+      changed_when: false
+      when:
+        - enable_disk_formatting | bool
+        - item.state | default('present') == 'present'
+
+    - name: mount disks and add to fstab
+      ansible.posix.mount:
+        path: "{{ item.mount_point }}"
+        src: "{{ item.device }}"
+        fstype: "{{ item.filesystem | default(default_filesystem) }}"
+        opts: "{{ item.mount_options | default(default_mount_options) }}"
+        state: "{{ item.state | default('mounted') }}"
+      with_items: "{{ disks_to_format }}"
+      when:
+        - item.mount_point is defined
+        - item.state | default('present') in ['present', 'mounted']
+      tags:
+        - mount-disks
+
+    - name: unmount disks and remove from fstab
+      ansible.posix.mount:
+        path: "{{ item.mount_point }}"
+        state: absent
+      with_items: "{{ disks_to_format }}"
+      when:
+        - item.mount_point is defined
+        - item.state | default('present') == 'absent'
+      tags:
+        - unmount-disks
+  when: enable_disk_formatting | bool
+  tags:
+    - disk-formatting

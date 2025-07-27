@@ -206,6 +206,18 @@
         - item.state | default('present') == 'absent'
       tags:
         - unmount-disks
+
+    - name: reload systemd daemon after fstab changes
+      systemd:
+        daemon_reload: true
+      tags:
+        - reload-systemd
+
+    - name: mount all filesystems from fstab
+      command: mount -a
+      changed_when: false
+      tags:
+        - mount-all
   when: enable_disk_formatting | bool
   tags:
     - disk-formatting

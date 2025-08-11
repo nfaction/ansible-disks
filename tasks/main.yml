@@ -182,17 +182,31 @@
         - enable_disk_formatting | bool
         - item.state | default('present') == 'present'
 
-    - name: mount disks and add to fstab
-      ansible.posix.mount:
-        path: "{{ item.mount_point }}"
-        src: "{{ item.device }}"
-        fstype: "{{ item.filesystem | default(default_filesystem) }}"
-        opts: "{{ item.mount_options | default(default_mount_options) }}"
-        state: "{{ item.state | default('mounted') }}"
+    - name: get filesystem UUIDs for formatted disks
+      command: blkid -s UUID -o value {{ item.device }}
+      register: disk_uuids
       with_items: "{{ disks_to_format }}"
+      changed_when: false
+      failed_when: false
       when:
         - item.mount_point is defined
         - item.state | default('present') in ['present', 'mounted']
+      tags:
+        - get-uuids
+
+    - name: mount disks using UUID and add to fstab
+      ansible.posix.mount:
+        path: "{{ item.item.mount_point }}"
+        src: "UUID={{ item.stdout }}"
+        fstype: "{{ item.item.filesystem | default(default_filesystem) }}"
+        opts: "{{ item.item.mount_options | default(default_mount_options) }}"
+        state: "{{ item.item.state | default('mounted') }}"
+      with_items: "{{ disk_uuids.results }}"
+      when:
+        - item.item.mount_point is defined
+        - item.item.state | default('present') in ['present', 'mounted']
+        - item.stdout is defined
+        - item.stdout | length > 0
       tags:
         - mount-disks
 
